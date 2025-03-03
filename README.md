@@ -7,16 +7,16 @@ DeepDefocusCTF is a physics-constrained neural network designed to estimate defo
 
 ```
 DeepDefocusCTF/
-│── prepareTrainingDataset.py   # Script to prepare training dataset
-│── trainModel.py               # Script to train the model
-│── predictModel.py             # Script for inference/predictions
-│── Utils/                      # Utility functions
+│── prepare_training_dataset.py   # Script to prepare training dataset
+│── train_model.py               # Script to train the model
+│── predict.py             # Script for inference/predictions
+│── utils/                      # Utility functions
 │   ├── utils.py
-│── Models/                     # Neural network model definition
-│   ├── DeepDefocusModel.py
-│── DataGenerator/              # Data loading and augmentation
-│   ├── dataGenerator.py
-│── TrainedModels/              # Directory to store trained models
+│── models/                     # Neural network model definition
+│   ├── deep_defocus_model.py
+│── data_generator/              # Data loading and augmentation
+│   ├── data_generator.py
+│── trained_models/              # Directory to store trained models
 │── README.md                   # Project description and usage
 │── requirements.txt             # Dependencies
 │── environment.yml              # Conda environment setup
