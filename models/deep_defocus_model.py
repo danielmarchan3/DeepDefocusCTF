@@ -5,7 +5,8 @@ from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, BatchNormalizat
 from tensorflow.keras import regularizers
 from tensorflow.keras import backend as K
 import tensorflow as tf
-from metrics_and_utils import *
+
+from utils.metrics_and_model import *
 
 # ----------------------------- Models architecture -------------------------------------
 

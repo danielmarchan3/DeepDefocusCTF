@@ -1,0 +1,9 @@
+numpy
+matplotlib
+pandas
+mrcfile
+scipy
+scikit-image
+tensorflow
+scikit-learn
+sqlite3

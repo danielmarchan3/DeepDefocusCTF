@@ -1,13 +1,46 @@
+import matplotlib.pyplot as plt
+import os
+import numpy as np
+
+import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import Callback
 from tensorflow.keras import backend as K
-import tensorflow as tf
-import matplotlib.pyplot as plt
-from utils.utils import center_window, compute_ctf, compute_ctf_tf
-import os
-import numpy as np
 from scipy.stats import pearsonr
+
+from processing.utils import center_window, compute_ctf, compute_ctf_tf
 from deep_defocus_model import DeepDefocusMultiOutputModel
+
+
+# ---------------------- TENSORFLOW UTILITIES --------------------------------------
+
+def start_session():
+    """Initialize TensorFlow session with dynamic memory allocation."""
+    tf.compat.v1.reset_default_graph()
+    tf.compat.v1.keras.backend.clear_session()
+
+    print('Enable dynamic memory allocation')
+    config = tf.compat.v1.ConfigProto()
+    config.gpu_options.allow_growth = True
+    session = tf.compat.v1.InteractiveSession(config=config)
+
+# ---------------------- DATA GENERATION UTILITIES --------------------------------------
+
+def prepare_test_data(df):
+    """Prepare test data from a DataFrame."""
+    Ndim = df.shape[0]
+    img_matrix = np.zeros((Ndim, 512, 512, 1), dtype=np.float64)
+    defocus_vector = np.zeros((Ndim, 2), dtype=np.float64)
+    angle_vector = np.zeros((Ndim, 1), dtype=np.float64)
+
+    for i, index in enumerate(df.index):
+        #img_matrix[i, :, :, 0] = xmipp.Image(df.at[index, 'FILE']).getData()
+        img_matrix[i, :, :, 0] = np.load(df.at[index, 'FILE'])
+        defocus_vector[i] = [df.at[index, 'DEFOCUS_U'], df.at[index, 'DEFOCUS_V']]
+        angle_vector[i, 0] = df.at[index, 'Angle']
+
+    return img_matrix, defocus_vector, angle_vector
+
 
 # ------------------------- Metrics to evaluate the Models loss during training ----------------------------------------
 
@@ -20,6 +53,7 @@ def angle_error_metric(y_true, y_pred):
     # Return the mean angle error
     return K.mean(angle_error_degrees)
 
+
 def mae_defocus_error(y_true, y_pred, defocus_scaler):
     median_ = defocus_scaler.center_
     iqr_ = defocus_scaler.scale_
@@ -30,6 +64,7 @@ def mae_defocus_error(y_true, y_pred, defocus_scaler):
     metric_value = tf.reduce_mean(tf.abs(y_true_unscaled - y_pred_unscaled))
 
     return metric_value
+
 
 def corr_CTF_metric(y_true, y_pred, defocus_scaler, cs, kV):
     sampling_rate = 1 # TODO Risky to put it here
@@ -127,13 +162,12 @@ def custom_loss_CTF_with_scaler(y_true, y_pred, defocus_scaler, cs, kV):
     #y_true_unscaled = y_true * defocus_scaler
     #y_pred_unscaled = y_pred * defocus_scaler
 
-    # Example: Access individual output tensors
+    # Access individual output tensors
     defocus_U_true = y_true_unscaled[:, 0]  # Assuming defocus_U is the first output
     defocus_V_true = y_true_unscaled[:, 1]  # Assuming defocus_V is the second output
     defocus_U_pred = y_pred_unscaled[:, 0]  # Assuming defocus_U is the first output
     defocus_V_pred = y_pred_unscaled[:, 1]  # Assuming defocus_V is the second output
 
-    # ------
     def elementwise_loss(defocus_U_true, defocus_U_pred, defocus_V_true, defocus_V_pred,
                          angle_true, angle_pred):
         # Extract true sin and cos values
@@ -280,6 +314,7 @@ def exampleCTFApplyingFunction(df_metadata):
 
 
 # -------------------------------------- Test this is for the training loss ---------------------------------------------
+
 class CosineAnnealingScheduler(Callback):
     def __init__(self, initial_learning_rate, max_epochs, verbose=0):
         super(CosineAnnealingScheduler, self).__init__()

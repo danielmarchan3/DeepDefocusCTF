@@ -1,20 +1,23 @@
 import os
 import sys
-# import magic
-# from time import time
-# import tensorflow as tf
-# import tensorflow.keras.callbacks as callbacks
-# from sklearn.metrics import mean_absolute_error
-# from sklearn.model_selection import train_test_split
-# import pandas as pd
-# from utils.utils import (start_session,  make_data_descriptive_plots,  plot_training_history, prepare_test_data,
-#                          make_training_plots, make_testing_plots, make_testing_angle_plots)
-# from data_generator.data_generator import CustomDataGenPINN
-# from models.deep_defocus_model import DeepDefocusMultiOutputModel
-# from models.metrics_and_utils import extract_CNN_layer_features, exampleCTFApplyingFunction, CosineAnnealingScheduler
-# import datetime
-# from sklearn.preprocessing import RobustScaler
-# import numpy as np
+import numpy as np
+from time import time
+import datetime
+import pandas as pd
+
+import tensorflow as tf
+import tensorflow.keras.callbacks as callbacks
+from sklearn.metrics import mean_absolute_error
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import RobustScaler
+
+from utils.metrics_and_model import (start_session, prepare_test_data,
+                                     extract_CNN_layer_features, exampleCTFApplyingFunction, CosineAnnealingScheduler)
+from utils.plotting import (make_data_descriptive_plots, plot_training_history,
+                            make_training_plots, make_testing_plots, make_testing_angle_plots)
+from data_generator.data_generator import CustomDataGenPINN
+from models.deep_defocus_model import DeepDefocusMultiOutputModel
+
 
 BATCH_SIZE = 16
 EPOCHS = 300
@@ -30,17 +33,14 @@ COLUMNS = {'id': 'ID', 'defocus_U': 'DEFOCUS_U', 'defocus_V': 'DEFOCUS_V',
 # ------------------------ MAIN PROGRAM -----------------------------
 if __name__ == "__main__":
 
-
-    file_path = "/mnt/hilbert_tres-dmarchan/Galileo-shadow_SafetyCopy/ScipionUserData/projects/Deep_Defocus_Test/Runs/001682_XmippProtCTFMicrographs/extra/Ribo_000_May04_aligned_mic_DW_xmipp_ctf.psd"  # Change this to your file path
-
-
-    # ----------- PARSING DATA -------------------
+    # ------------------------------------- PARSING DATA ----------------------------------------------------------------
     if len(sys.argv) < 3:
         print("Usage: python3 train_model.py <metadataDir> <modelDir>")
         sys.exit()
 
     metadataDir = sys.argv[1]
     modelDir = sys.argv[2]
+    # Todo: esto ya lo hacemos porque estamos haciendo un downsample a 2A y tenemos input 515x512
     input_size = (256, 256, 1)
     objective_res = 2
     sampling_rate = 1
@@ -48,10 +48,10 @@ if __name__ == "__main__":
     testing_Bool = True
     plots_Bool = True
 
-    # ----------- INITIALIZING SYSTEM ------------------
+    # -------------------------------------- INITIALIZING SYSTEM ------------------------------------------------------
     start_session()
 
-    # ----------- LOADING DATA ------------------
+    # ---------------------------------------- LOADING DATA -----------------------------------------------------------
     print("Loading data...")
     path_metadata = os.path.join(metadataDir, "metadata.csv")
     df_metadata = pd.read_csv(path_metadata)
@@ -74,24 +74,27 @@ if __name__ == "__main__":
     #df_metadata['DEFOCUS_U_SCALED'] = df_metadata[COLUMNS['defocus_U']]/scaler_factor
     #df_metadata['DEFOCUS_V_SCALED'] = df_metadata[COLUMNS['defocus_V']]/scaler_factor
 
-    # -------------------------------- STATISTICS ------------------------------------------------------
+    # ----------------------------------------------- STATISTICS -------------------------------------------------------
+
     print(df_metadata.describe())
 
-    # ------------------------------- DESCRIPTIVE PLOTS ---------------------------------------------------
+    # -------------------------------------------- DESCRIPTIVE PLOTS ---------------------------------------------------
+
     if plots_Bool:
         make_data_descriptive_plots(df_metadata, modelDir, COLUMNS, ground_Truth)
 
-    # ----------- SPLIT DATA: TRAIN, VALIDATE and TEST ------------
+    # -------------------------------------- SPLIT DATA: TRAIN, VALIDATE and TEST --------------------------------------
+
     df_training, df_test = train_test_split(df_metadata, test_size=TEST_SIZE)
     df_train, df_validate = train_test_split(df_training, test_size=0.20)
 
-    # ---------------------------- TEST CTF FUNCTION IMPLEMENTATION --------------------------------------
+    # ------------------------------------- TEST CTF FUNCTION IMPLEMENTATION -------------------------------------------
 
     # exampleCTFApplyingFunction(df_train)
 
-    # --------------------------------- TRAINING MODELS --------------------------------------------------
+    # ------------------------------------------- TRAINING MODELS ------------------------------------------------------
 
-    # TODO: The number of batches is equal to len(df)//batch_size
+    # OJO: The number of batches is equal to len(df)//batch_size
     traingen = CustomDataGenPINN(data=df_train.head(7200), batch_size=BATCH_SIZE,
                                 objective_res=objective_res, sampling_rate=sampling_rate)
 
@@ -164,12 +167,13 @@ if __name__ == "__main__":
     else:
         print("No GPU devices available.")
 
-    # ----------- SAVING DEFOCUS MODEL AND VAL INFORMATION -------------------
+    # -------------------------------- SAVING DEFOCUS MODEL AND VAL INFORMATION ---------------------------------------
+
     # TODO: NOT FOR THE MOMENT
     # model.save(os.path.join(modelDir, 'model.h5'))
 
-    # TODO THIS SHOULD BE IN ANOTHER SCRIPT
-    # ----------- TESTING DEFOCUS MODEL -------------------
+    # -------------------------------------- TESTING DEFOCUS MODEL -----------------------------------------------------
+
     if testing_Bool:
         print("Test mode")
         # loadModelDir = os.path.join(modelDir, 'model.h5')

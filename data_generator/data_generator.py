@@ -1,6 +1,8 @@
-import tensorflow as tf
 import numpy as np
-from utils.utils import center_window
+import tensorflow as tf
+
+from utils.processing import center_window
+
 
 class CustomDataGenPINN(tf.keras.utils.Sequence):
     def __init__(self, data, batch_size, objective_res, sampling_rate):

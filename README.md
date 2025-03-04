@@ -11,7 +11,9 @@ DeepDefocusCTF/
 │── train_model.py               # Script to train the model
 │── predict.py             # Script for inference/predictions
 │── utils/                      # Utility functions
-│   ├── utils.py
+│   ├── metrics_and_model.py
+│   ├── plotting.py
+│   ├── processing.py
 │── models/                     # Neural network model definition
 │   ├── deep_defocus_model.py
 │── data_generator/              # Data loading and augmentation
