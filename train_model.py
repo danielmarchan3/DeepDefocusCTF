@@ -1,7 +1,7 @@
 import os
 import sys
 import numpy as np
-from time import time
+from time import time, sleep
 import datetime
 import pandas as pd
 
@@ -11,23 +11,19 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import RobustScaler
 
-from utils.metrics_and_model import (start_session, prepare_test_data,
-                                     extract_CNN_layer_features, exampleCTFApplyingFunction, CosineAnnealingScheduler)
-from utils.plotting import (make_data_descriptive_plots, plot_training_history,
-                            make_training_plots, make_testing_plots, make_testing_angle_plots)
+from utils.metrics_and_model import (start_session, prepare_test_data, exampleCTFApplyingFunction, CosineAnnealingScheduler)
+from utils.plotting import (make_data_descriptive_plots, make_training_plots, make_testing_plots, make_testing_angle_plots)
 from data_generator.data_generator import CustomDataGenPINN
-from models.deep_defocus_model import DeepDefocusMultiOutputModel
-
+from models.deep_defocus_model import DeepDefocusMultiOutputModel, DeepDefocusSimpleModel
 
 BATCH_SIZE = 16
-EPOCHS = 300
+EPOCHS = 200
 TEST_SIZE = 0.10
 LEARNING_RATE_DEF = 0.0001
-SCALE_FACTOR = 50000
 
 COLUMNS = {'id': 'ID', 'defocus_U': 'DEFOCUS_U', 'defocus_V': 'DEFOCUS_V',
            'sinAngle': 'Sin(2*angle)', 'cosAngle': 'Cos(2*angle)',
-           'angle': 'Angle', 'kV': 'kV', 'file': 'FILE'}
+           'angle': 'Angle', 'resolution':'Resolution','kV': 'kV', 'file': 'FILE'}
 
 
 # ------------------------ MAIN PROGRAM -----------------------------
@@ -40,21 +36,33 @@ if __name__ == "__main__":
 
     metadataDir = sys.argv[1]
     modelDir = sys.argv[2]
-    # Todo: esto ya lo hacemos porque estamos haciendo un downsample a 2A y tenemos input 515x512
-    input_size = (256, 256, 1)
+    input_size = (256, 256, 1) # We have 512x512 PSD images at 1A resolution, so we are staying only with the center region of 2A
     objective_res = 2
-    sampling_rate = 1
-    ground_Truth = True
+    sampling_rate = 1 # The PSDs of our images have a sampling rate of 1A
+    ground_Truth = False
     testing_Bool = True
     plots_Bool = True
 
     # -------------------------------------- INITIALIZING SYSTEM ------------------------------------------------------
+    # Step 1: GPU Configuration (MUST be done before TensorFlow starts)
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if gpus:
+        try:
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)  # Enable memory growth
+            print("GPU memory growth enabled.")
+        except RuntimeError as e:
+            print(f"Error setting memory growth: {e}")
+
+    # Step 2: Start session (clear any old session)
     start_session()
 
     # ---------------------------------------- LOADING DATA -----------------------------------------------------------
     print("Loading data...")
     path_metadata = os.path.join(metadataDir, "metadata.csv")
     df_metadata = pd.read_csv(path_metadata)
+
+    os.makedirs(modelDir, exist_ok=True)
 
     # Stack the 'defocus_U' and 'defocus_V' columns into a single column
     stacked_data = df_metadata[[COLUMNS['defocus_U'], COLUMNS['defocus_V']]].stack().reset_index(drop=True)
@@ -77,11 +85,12 @@ if __name__ == "__main__":
     # ----------------------------------------------- STATISTICS -------------------------------------------------------
 
     print(df_metadata.describe())
+    print(df_metadata.isnull().any())
 
     # -------------------------------------------- DESCRIPTIVE PLOTS ---------------------------------------------------
 
     if plots_Bool:
-        make_data_descriptive_plots(df_metadata, modelDir, COLUMNS, ground_Truth)
+        make_data_descriptive_plots(df_metadata, modelDir, COLUMNS, True, ground_Truth)
 
     # -------------------------------------- SPLIT DATA: TRAIN, VALIDATE and TEST --------------------------------------
 
@@ -90,7 +99,7 @@ if __name__ == "__main__":
 
     # ------------------------------------- TEST CTF FUNCTION IMPLEMENTATION -------------------------------------------
 
-    # exampleCTFApplyingFunction(df_train)
+    #exampleCTFApplyingFunction(df_train)
 
     # ------------------------------------------- TRAINING MODELS ------------------------------------------------------
 
@@ -114,7 +123,7 @@ if __name__ == "__main__":
                                     min_delta=0.0001, cooldown=2, min_lr=0.000001),
         # CosineAnnealingScheduler(LEARNING_RATE_DEF, EPOCHS, verbose=1),
         callbacks.EarlyStopping(monitor='val_loss', patience=18),
-        callbacks.ModelCheckpoint(filepath=os.path.join(path_logs_defocus, 'Best_Weights'),
+        callbacks.ModelCheckpoint(filepath=os.path.join(path_logs_defocus, 'Best_Weights.weights.h5'),
                                       save_weights_only=True,
                                       save_best_only=True,
                                       monitor='val_loss',
@@ -126,10 +135,6 @@ if __name__ == "__main__":
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:
         try:
-            # Enable GPU memory growth
-            for gpu in gpus:
-                tf.config.experimental.set_memory_growth(gpu, True)
-
             # Create a MirroredStrategy
             strategy = tf.distribute.MirroredStrategy()
 
@@ -137,35 +142,42 @@ if __name__ == "__main__":
                 # Define and compile your model within the strategy scope
                 print("Training defocus model")
                 start_time = time()
-                model_defocus = DeepDefocusMultiOutputModel(width=input_size[0], height=input_size[1]
+                #model_defocus = DeepDefocusMultiOutputModel(width=input_size[0], height=input_size[1]
+                #                                            ).getFullModel(learning_rate=LEARNING_RATE_DEF,
+                #                                                               defocus_scaler=scaler, cs=2.7e7,
+                #                                                               kV=300)
+                model_defocus = DeepDefocusSimpleModel(width=input_size[0], height=input_size[1]
                                                             ).getFullModel(learning_rate=LEARNING_RATE_DEF,
-                                                                               defocus_scaler=scaler, cs=2.7e7,
-                                                                               kV=200)
+                                                                           defocus_scaler=scaler, cs=2.7e7,
+                                                                           kV=300)
 
             # Train the model using fit method
             history_defocus = model_defocus.fit(traingen,
                                                 validation_data=valgen,
                                                 epochs=EPOCHS,
                                                 callbacks=callbacks_list_def,
-                                                verbose=1
-                                                )
+                                                verbose=1)
+
+
 
             elapsed_time = time() - start_time
             print("Time in training model: %0.10f seconds." % elapsed_time)
 
             if plots_Bool:
-                # plot_training_history(history_defocus, path_logs_defocus, "defocus_")
                 make_training_plots(history_defocus, path_logs_defocus, "defocus_")
 
+
             one_image_data_path = df_test.head(1)['FILE'].values[0]
-            extract_CNN_layer_features(path_logs_defocus, one_image_data_path,
-                                        layers=6, defocus_scaler=scaler,
-                                        objective_res=objective_res, sampling_rate=sampling_rate, xDim=input_size[0])
+            # extract_CNN_layer_features(path_logs_defocus, one_image_data_path,
+            #                             layers=6, defocus_scaler=scaler,
+            #                             objective_res=objective_res, sampling_rate=sampling_rate, xDim=input_size[0])
 
         except Exception as e:
             print(e)
+            exit('Problems with the training')
     else:
         print("No GPU devices available.")
+        exit('Problems with the training')
 
     # -------------------------------- SAVING DEFOCUS MODEL AND VAL INFORMATION ---------------------------------------
 
@@ -178,13 +190,16 @@ if __name__ == "__main__":
         print("Test mode")
         # loadModelDir = os.path.join(modelDir, 'model.h5')
         # model = load_model(loadModelDir)
-        model_defocus = DeepDefocusMultiOutputModel(width=input_size[0], height=input_size[1]).getFullModel(learning_rate=0.001,
-                                                                                        defocus_scaler=scaler,
-                                                                                        cs=2.7e7, kV=200)
-        model_defocus.load_weights(filepath=os.path.join(path_logs_defocus, 'Best_Weights'))
+        #model_defocus = DeepDefocusMultiOutputModel(width=input_size[0], height=input_size[1]).getFullModel(learning_rate=0.001,
+        #                                                                                defocus_scaler=scaler,
+         #                                                                               cs=2.7e7, kV=200)
+        model_defocus = DeepDefocusSimpleModel(width=input_size[0], height=input_size[1]).getFullModel(
+            learning_rate=0.001,
+            defocus_scaler=scaler,
+            cs=2.7e7, kV=200)
 
+        model_defocus.load_weights(filepath=os.path.join(path_logs_defocus, 'Best_Weights.weights.h5'))
         imagesTest, defocusTest, anglesTest = prepare_test_data(df_test)
-
 
         print("Testing defocus model")
         defocusPrediction_scaled = model_defocus.predict(testgen)

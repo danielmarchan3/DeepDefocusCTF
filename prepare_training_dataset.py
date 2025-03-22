@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from utils.processing import rotate_image, sum_angles, compute_ctf, process_micrographs_parallel
+from utils.processing import rotate_image, sum_angles, compute_ctf_tf, process_micrographs_parallel
 
 # Constants
 DB_NAME = "ctfs.sqlite"
@@ -96,7 +96,7 @@ def create_metadata_ctf(file_list: list, output_dir: str, pixel_size: float, use
         df_metadata.at[index, "FILE"] = psd_filename
 
     metadata_path = os.path.join(output_dir, "metadata.csv")
-    process_micrographs_parallel(mic_list, output_dir, pixel_size)
+    process_micrographs_parallel(mic_list, output_dir, pixel_size, target_pixel_size=1)
 
     if os.path.exists(metadata_path):
         df_prev = pd.read_csv(metadata_path)
@@ -140,7 +140,7 @@ def generate_phantom_data(output_dir: str):
         size = 512
 
         print(f"Generating synthetic CTF: {new_file_path}")
-        ctf_array = compute_ctf(kV, sampling_rate, size, defocusU, defocusV, cs, 0, defocusA)
+        ctf_array = compute_ctf_tf(kV, sampling_rate, size, defocusU, defocusV, cs, 0, defocusA)
         np.save(new_file_path, ctf_array)
 
         df_metadata.at[index, "FILE"] = new_file_path

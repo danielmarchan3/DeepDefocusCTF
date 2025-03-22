@@ -31,36 +31,60 @@ def plot_correlation(real, prediction, title, folder, filename):
     save_plot(plt, folder, filename)
 
 
-def make_data_descriptive_plots(df_metadata, folder, COLUMNS, ground_truth=False):
-    df_defocus = df_metadata[[COLUMNS['defocus_U'], COLUMNS['defocus_V']]]
-
-    plot_histogram(df_defocus, 'Defocus histogram', folder, 'defocus_histogram.png')
-
-    plot_correlation(df_metadata[COLUMNS['defocus_U']], df_metadata[COLUMNS['defocus_V']],
-                     'Defocus correlation', folder ,'defocus_correlation.png')
-
-    if ground_truth:
-        df_defocus['ErrorU'] = df_metadata[COLUMNS['defocus_U']] - df_metadata['DEFOCUS_U_Est']
-        df_defocus['ErrorV'] = df_metadata[COLUMNS['defocus_V']] - df_metadata['DEFOCUS_V_Est']
-
-        df_defocus[['ErrorU', 'ErrorV']].plot.hist(alpha=0.5, bins=25)
-        plt.title('Defocus error histogram')
-        plt.savefig(os.path.join(folder, 'defocus_error_hist.png'))
+def make_data_descriptive_plots(df_metadata, folder, COLUMNS, trainDefocus=True, groundTruth=False):
+    if trainDefocus:
+        # HISTOGRAM
+        df_defocus = df_metadata[[COLUMNS['defocus_U'], COLUMNS['defocus_V']]]
+        df_defocus.plot.hist(alpha=0.5, bins=25)
+        plt.title('Defocus histogram')
+        plt.savefig(os.path.join(folder, 'defocus_histogram.png'))
         # BOXPLOT
+        df_defocus.plot.box()
+        plt.title('Defocus boxplot')
+        plt.savefig(os.path.join(folder, 'defocus_boxplot.png'))
+        # SCATTER
+        df_defocus.plot.scatter(x=COLUMNS['defocus_U'], y=COLUMNS['defocus_V'])
+        plt.title('Correlation plot defocus U vs V')
+        plt.plot([0, df_defocus[COLUMNS['defocus_U']].max()],
+                 [0, df_defocus[COLUMNS['defocus_U']].max()],
+                 color='red')
+        plt.savefig(os.path.join(folder, 'defocus_correlation.png'))
+
+        if groundTruth:
+            df_defocus['ErrorU'] = df_metadata[COLUMNS['defocus_U']] - df_metadata['DEFOCUS_U_Est']
+            df_defocus['ErrorV'] = df_metadata[COLUMNS['defocus_V']] - df_metadata['DEFOCUS_V_Est']
+
+            df_defocus[['ErrorU', 'ErrorV']].plot.hist(alpha=0.5, bins=25)
+            plt.title('Defocus error histogram')
+            plt.savefig(os.path.join(folder, 'defocus_error_hist.png'))
+            # BOXPLOT
+            plt.figure()
+            df_defocus[['ErrorU', 'ErrorV']].plot.box()
+            plt.title('Defocus error boxplot')
+            plt.savefig(os.path.join(folder, 'defocus_error_boxplot.png'))
+
+        print(df_defocus.describe())
+
+        # TODO: more Angles plots
+        # HISTOGRAM
+        df_angle = df_metadata[[COLUMNS['angle'], COLUMNS['cosAngle'], COLUMNS['sinAngle']]]
         plt.figure()
-        df_defocus[['ErrorU', 'ErrorV']].plot.box()
-        plt.title('Defocus error boxplot')
-        plt.savefig(os.path.join(folder, 'defocus_error_boxplot.png'))
+        plt.hist(df_angle[COLUMNS['angle']], bins=25, alpha=0.5, color='skyblue', edgecolor='black')
+        plt.title('Angle Histogram')
+        plt.xlabel('Angle')
+        plt.ylabel('Frequency')
+        plt.grid(True)
+        plt.savefig(os.path.join(folder, 'angle_histogram.png'))
+        print(df_angle.head())
 
-    print(df_defocus.describe())
-
-    df_angle = df_metadata[[COLUMNS['angle'], COLUMNS['cosAngle'], COLUMNS['sinAngle']]]
-    plot_histogram(df_angle, 'Angle histogram', folder, 'angle_histogram.png')
-
-    if ground_truth:
-        df_angle_error = df_metadata[COLUMNS['angle']] - df_metadata['Angle_Est']
-        plot_histogram(df_angle_error, 'Angle error histogram', folder, 'angle_error_histogram.png')
-        print(df_angle_error.describe())
+        if groundTruth:
+            df_angle_error = df_metadata[COLUMNS['angle']] - df_metadata['Angle_Est']
+            plt.figure()
+            df_angle_error.plot.hist(alpha=0.5, bins=25)
+            plt.title('Angle error')
+            plt.savefig(os.path.join(folder, 'angle_error_hist.png'))
+            print('Df angle error')
+            print(df_angle_error.describe())
 
 
 def make_training_plots(history, folder, prefix):
@@ -81,7 +105,7 @@ def make_training_plots(history, folder, prefix):
     # Plot Learning Rate decreasing
     plt.figure(figsize=(10, 6))  # Adjust the figure size as needed
     # Plot Learning Rate
-    plt.plot(history.epoch, history.history["lr"], "bo-", label="Learning Rate")
+    plt.plot(history.epoch, history.history["learning_rate"], "bo-", label="Learning Rate")
     plt.xlabel("Epoch")
     plt.ylabel("Learning Rate", color='b')
     plt.tick_params(axis='y', colors='b')
@@ -225,16 +249,3 @@ def make_testing_angle_plots(prediction, real, folder):
     plt.tight_layout()
     # Save the figure
     plt.savefig(os.path.join(folder, 'defocus_angle_prediction_error.png'))
-
-
-def plot_training_history(history, folder, prefix):
-    """Plot and save training and validation loss over epochs."""
-    plt.figure(figsize=(10, 6))
-    plt.plot(history.history['loss'], 'b', label='Training Loss')
-    plt.plot(history.history['val_loss'], 'r', label='Validation Loss')
-    plt.title('Training and Validation Loss')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.grid(True, linestyle='--', alpha=0.7)
-    save_plot(plt, folder, f'{prefix}_Training_and_Loss.png')
