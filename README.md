@@ -32,7 +32,7 @@ To set up the environment, use Conda:
 
 ```bash
 conda env create -f environment.yml
-conda activate deepdefocusctf
+conda activate deepdefocus_env
 ```
 
 Or install dependencies using pip:
