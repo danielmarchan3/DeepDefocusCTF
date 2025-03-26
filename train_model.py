@@ -13,11 +13,11 @@ from sklearn.preprocessing import RobustScaler
 
 from utils.metrics_and_model import (start_session, prepare_test_data, exampleCTFApplyingFunction, CosineAnnealingScheduler)
 from utils.plotting import (make_data_descriptive_plots, make_training_plots, make_testing_plots, make_testing_angle_plots)
-from data_generator.data_generator import CustomDataGenPINN
+from data_generator.data_generator import CustomDataGenPINN, CustomDataGenPINN_old
 from models.deep_defocus_model import DeepDefocusMultiOutputModel, DeepDefocusSimpleModel
 
-BATCH_SIZE = 16
-EPOCHS = 200
+BATCH_SIZE = 32
+EPOCHS = 300
 TEST_SIZE = 0.10
 LEARNING_RATE_DEF = 0.0001
 
@@ -104,10 +104,10 @@ if __name__ == "__main__":
     # ------------------------------------------- TRAINING MODELS ------------------------------------------------------
 
     # OJO: The number of batches is equal to len(df)//batch_size
-    traingen = CustomDataGenPINN(data=df_train.head(7200), batch_size=BATCH_SIZE,
+    traingen = CustomDataGenPINN(data=df_train.head(1984), batch_size=BATCH_SIZE,
                                 objective_res=objective_res, sampling_rate=sampling_rate)
 
-    valgen = CustomDataGenPINN(data=df_validate.head(1800), batch_size=BATCH_SIZE,
+    valgen = CustomDataGenPINN(data=df_validate.head(480), batch_size=BATCH_SIZE,
                                 objective_res=objective_res, sampling_rate=sampling_rate)
 
     testgen = CustomDataGenPINN(data=df_test, batch_size=1,
@@ -118,11 +118,11 @@ if __name__ == "__main__":
     callbacks_list_def = [
         callbacks.CSVLogger(os.path.join(path_logs_defocus, 'defocus.csv'), separator=',', append=False),
         callbacks.TensorBoard(log_dir=path_logs_defocus, histogram_freq=1),
-        callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=6, verbose=1,
+        callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=10, verbose=1,
                                     mode='auto',
                                     min_delta=0.0001, cooldown=2, min_lr=0.000001),
         # CosineAnnealingScheduler(LEARNING_RATE_DEF, EPOCHS, verbose=1),
-        callbacks.EarlyStopping(monitor='val_loss', patience=18),
+        callbacks.EarlyStopping(monitor='val_loss', patience=20),
         callbacks.ModelCheckpoint(filepath=os.path.join(path_logs_defocus, 'Best_Weights.weights.h5'),
                                       save_weights_only=True,
                                       save_best_only=True,
@@ -142,14 +142,14 @@ if __name__ == "__main__":
                 # Define and compile your model within the strategy scope
                 print("Training defocus model")
                 start_time = time()
-                #model_defocus = DeepDefocusMultiOutputModel(width=input_size[0], height=input_size[1]
-                #                                            ).getFullModel(learning_rate=LEARNING_RATE_DEF,
-                #                                                               defocus_scaler=scaler, cs=2.7e7,
-                #                                                               kV=300)
-                model_defocus = DeepDefocusSimpleModel(width=input_size[0], height=input_size[1]
+                model_defocus = DeepDefocusMultiOutputModel(width=input_size[0], height=input_size[1]
                                                             ).getFullModel(learning_rate=LEARNING_RATE_DEF,
-                                                                           defocus_scaler=scaler, cs=2.7e7,
-                                                                           kV=300)
+                                                                               defocus_scaler=scaler, cs=2.7e7,
+                                                                               kV=300)
+                #model_defocus = DeepDefocusSimpleModel(width=input_size[0], height=input_size[1]
+                #                                            ).getFullModel(learning_rate=LEARNING_RATE_DEF,
+                #                                                           defocus_scaler=scaler, cs=2.7e7,
+                #                                                           kV=300)
 
             # Train the model using fit method
             history_defocus = model_defocus.fit(traingen,
@@ -190,13 +190,13 @@ if __name__ == "__main__":
         print("Test mode")
         # loadModelDir = os.path.join(modelDir, 'model.h5')
         # model = load_model(loadModelDir)
-        #model_defocus = DeepDefocusMultiOutputModel(width=input_size[0], height=input_size[1]).getFullModel(learning_rate=0.001,
-        #                                                                                defocus_scaler=scaler,
-         #                                                                               cs=2.7e7, kV=200)
-        model_defocus = DeepDefocusSimpleModel(width=input_size[0], height=input_size[1]).getFullModel(
-            learning_rate=0.001,
-            defocus_scaler=scaler,
-            cs=2.7e7, kV=200)
+        model_defocus = DeepDefocusMultiOutputModel(width=input_size[0], height=input_size[1]).getFullModel(learning_rate=0.001,
+                                                                                        defocus_scaler=scaler,
+                                                                                       cs=2.7e7, kV=200)
+        #model_defocus = DeepDefocusSimpleModel(width=input_size[0], height=input_size[1]).getFullModel(
+        #    learning_rate=0.001,
+        #    defocus_scaler=scaler,
+        #    cs=2.7e7, kV=200)
 
         model_defocus.load_weights(filepath=os.path.join(path_logs_defocus, 'Best_Weights.weights.h5'))
         imagesTest, defocusTest, anglesTest = prepare_test_data(df_test)

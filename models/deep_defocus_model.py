@@ -21,26 +21,8 @@ class DeepDefocusMultiOutputModel():
         self.IM_WIDTH = width
         self.IM_HEIGHT = height
 
-    def build_defocus_branch_new(self, input, suffix):
-        h = Conv2D(filters=16, kernel_size=(11, 11),  # Larger kernel to capture broader Thon rings
-                   activation='relu', padding='same', name='conv2d_1' + suffix)(input)
-        h = BatchNormalization(epsilon=1e-5)(h)
-        h = MaxPool2D(pool_size=(2, 2), name='pool_1' + suffix)(h)
 
-        h = Conv2D(filters=32, kernel_size=(7, 7),
-                   activation='relu', padding='same', name='conv2d_2' + suffix)(h)
-        h = BatchNormalization(epsilon=1e-5)(h)
-        h = MaxPool2D(pool_size=(3, 3), name='pool_2' + suffix)(h)
-
-        h = Conv2D(filters=64, kernel_size=(3, 3),
-                   activation='relu', padding='same', name='conv2d_3' + suffix)(h)
-        h = BatchNormalization(epsilon=1e-5)(h)
-
-        h = Flatten(name='flatten' + suffix)(h)
-
-        return h
-
-    def build_defocus_branch_new_old(self, input, suffix):
+    def build_defocus_branch(self, input, suffix):
         """
         Used to build the defocus in V branch of our multi-regression network.
         This branch is composed of three Conv -> BN -> Pool -> Dropout blocks,
@@ -48,24 +30,24 @@ class DeepDefocusMultiOutputModel():
 
         h = Conv2D(filters=16, kernel_size=(8, 8), # 8, 8
                    activation='relu', padding='same', name='conv2d_1'+suffix)(input)
-        #h = Conv2D(filters=16, kernel_size=(8, 8),
-        #           activation='relu', padding='same', name='conv2d_2'+suffix)(h)
+        h = Conv2D(filters=16, kernel_size=(8, 8),
+                   activation='relu', padding='same', name='conv2d_2'+suffix)(h)
         h = BatchNormalization()(h)
 
         h = MaxPool2D(pool_size=(2, 2), name='pool_1'+suffix)(h)
 
         h = Conv2D(filters=16, kernel_size=(6, 6),
                    activation='relu', padding='same', name='conv2d_3'+suffix)(h)
-        #h = Conv2D(filters=16, kernel_size=(6, 6),
-        #           activation='relu', padding='same', name='conv2d_4'+suffix)(h)
+        h = Conv2D(filters=16, kernel_size=(6, 6),
+                   activation='relu', padding='same', name='conv2d_4'+suffix)(h)
         h = BatchNormalization()(h)
 
         h = MaxPool2D(pool_size=(3, 3), name='pool_2'+suffix)(h)
 
         h = Conv2D(filters=16, kernel_size=(2, 2),
                    activation='relu', padding='same', name='conv2d_5'+suffix)(h)
-        #h = Conv2D(filters=16, kernel_size=(2, 2),
-        #           activation='relu', padding='same', name='conv2d_6'+suffix)(h)
+        h = Conv2D(filters=16, kernel_size=(2, 2),
+                   activation='relu', padding='same', name='conv2d_6'+suffix)(h)
         h = BatchNormalization()(h)
 
         # h = Conv2D(filters=16, kernel_size=(2, 2),
@@ -78,7 +60,7 @@ class DeepDefocusMultiOutputModel():
 
         return h
 
-    def build_angle_branch_new(self, input, suffix):
+    def build_angle_branch(self, input, suffix):
         """
         Used to build the defocus in V branch of our multi-regression network.
         This branch is composed of three Conv -> BN -> Pool -> Dropout blocks,
@@ -86,13 +68,15 @@ class DeepDefocusMultiOutputModel():
 
         h = Conv2D(filters=16, kernel_size=(64, 64),
                    activation='relu', padding='same', name='conv2d_1'+suffix)(input)
+        #h = Conv2D(filters=16, kernel_size=(64, 64),
+        #            activation='relu', padding='same', name='conv2d_2'+suffix)(h)
         h = BatchNormalization(epsilon=1e-5)(h)
         h = MaxPool2D(pool_size=(2, 2), name='pool_1'+suffix)(h)
 
         h = Conv2D(filters=16, kernel_size=(8, 8),
                    activation='relu', padding='same', name='conv2d_3'+suffix)(h)
-        # h = Conv2D(filters=16, kernel_size=(8, 8),
-        #            activation='relu', padding='same', name='conv2d_4'+suffix)(h)
+        h = Conv2D(filters=16, kernel_size=(8, 8),
+                    activation='relu', padding='same', name='conv2d_4'+suffix)(h)
         h = BatchNormalization(epsilon=1e-5)(h)
 
         h = MaxPool2D(pool_size=(3, 3), name='pool_2'+suffix)(h)
@@ -107,10 +91,10 @@ class DeepDefocusMultiOutputModel():
 
 
     def build_defocusU_branch(self, convLayer):
-        L = Dense(64, activation='relu', kernel_initializer='he_normal',
+        L = Dense(32, activation='relu', kernel_initializer='he_normal',
                   kernel_regularizer=regularizers.l1_l2(0.001), name="denseU_1")(convLayer)
         L = Dropout(0.2, name="DropU_1")(L)
-        L = Dense(32, activation='relu', name="denseU_2")(L)
+        L = Dense(16, activation='relu', name="denseU_2")(L)
 
         defocusU = Dense(1, activation='linear', name='defocus_U_output')(L)
 
@@ -118,28 +102,19 @@ class DeepDefocusMultiOutputModel():
 
 
     def build_defocusV_branch(self, convLayer):
-        L = Dense(64, activation='relu', kernel_initializer='he_normal',
+        L = Dense(32, activation='relu', kernel_initializer='he_normal',
                   kernel_regularizer=regularizers.l1_l2(0.001), name="denseV_1")(convLayer)
         L = Dropout(0.2, name="DropV_1")(L)
-        L = Dense(32, activation='relu', name="denseV_2")(L)
+        L = Dense(16, activation='relu', name="denseV_2")(L)
 
         defocusV = Dense(1, activation='linear', name='defocus_V_output')(L)
 
         return defocusV
 
-    # def build_defocusV_branch(self, convLayer):
-    #     L = Dense(32, activation='relu', kernel_initializer='normal', kernel_regularizer=regularizers.l1_l2(0.01),
-    #               name="denseV_1")(convLayer)
-    #     L = Dropout(0.1, name="DropV_1")(L)
-    #     L = Dense(16, activation='relu', name="denseV_2")(L)
-    #
-    #     defocusV = Dense(1, activation='linear', name='defocus_V_output')(L)
-    #
-    #     return defocusV
 
-    def build_angle_branch(self, convLayer):
+    def build_angle_dense_branch(self, convLayer):
         L = Dense(32, activation='relu', kernel_regularizer=regularizers.l1_l2(0.01), name="denseAngle_1")(convLayer)
-        L = Dropout(0.1, name="DropA_1")(L)
+        L = Dropout(0.2, name="DropA_1")(L)
         L = Dense(16, activation='relu', name="denseAngle_2")(L)
 
         angle = Dense(1, activation='sigmoid', name='angle_output')(L)
@@ -151,17 +126,17 @@ class DeepDefocusMultiOutputModel():
         input_layer = Input(shape=input_shape, name='input')
 
         # DEFOCUS U and V
-        defocus_branch_at_2 = self.build_defocus_branch_new(input_layer, suffix="defocus")
+        defocus_branch_at_2 = self.build_defocus_branch(input_layer, suffix="defocus")
         L = Dropout(0.2)(defocus_branch_at_2)
 
         defocusU = self.build_defocusU_branch(L)
         defocusV = self.build_defocusV_branch(L)
 
         # DEFOCUS ANGLE
-        defocus_angles_branch = self.build_angle_branch_new(input_layer, suffix="angle")
+        defocus_angles_branch = self.build_angle_branch(input_layer, suffix="angle")
         La = Dropout(0.2)(defocus_angles_branch)
 
-        angle = self.build_angle_branch(La)
+        angle = self.build_angle_dense_branch(La)
 
         # OUTPUT
         concatenated = Concatenate(name='ctf_values')([defocusU, defocusV, angle])
@@ -190,8 +165,8 @@ class DeepDefocusMultiOutputModel():
         def corr_CTF(y_true, y_pred):
             return corr_CTF_metric(y_true, y_pred, defocus_scaler, cs, kV)
 
-        model.compile(optimizer=optimizer, loss=loss_custom, metrics=[angle_error, mae_defocus, corr_CTF], loss_weights=None)
-        # model.compile(optimizer=optimizer, loss='mae', metrics=['mse'], loss_weights=None)
+        #model.compile(optimizer=optimizer, loss=loss_custom, metrics=[angle_error, mae_defocus, corr_CTF], loss_weights=None)
+        model.compile(optimizer=optimizer, loss='mae', metrics=[angle_error, mae_defocus, corr_CTF], loss_weights=None)
 
         return model
 
@@ -204,7 +179,7 @@ class DeepDefocusSimpleModel():
         self.IM_WIDTH = width
         self.IM_HEIGHT = height
 
-    def build_cnn_branch(self, input, suffix):
+    def build_cnn_branch_chatgpt(self, input, suffix):
         h = Conv2D(filters=16, kernel_size=(11, 11),  # Larger kernel to capture broader Thon rings
                    activation='relu', padding='same', name='conv2d_1' + suffix)(input)
         h = BatchNormalization(epsilon=1e-5)(h)
@@ -218,6 +193,44 @@ class DeepDefocusSimpleModel():
         h = Conv2D(filters=64, kernel_size=(3, 3),
                    activation='relu', padding='same', name='conv2d_3' + suffix)(h)
         h = BatchNormalization(epsilon=1e-5)(h)
+
+        h = Flatten(name='flatten' + suffix)(h)
+
+        return h
+
+    def build_cnn_branch(self, input, suffix):
+        """
+        Used to build the defocus in V branch of our multi-regression network.
+        This branch is composed of three Conv -> BN -> Pool -> Dropout blocks,
+        followed by the Dense output layer.        """
+
+        h = Conv2D(filters=16, kernel_size=(8, 8),  # 8, 8
+                   activation='relu', padding='same', name='conv2d_1' + suffix)(input)
+        h = Conv2D(filters=16, kernel_size=(8, 8),
+                   activation='relu', padding='same', name='conv2d_2'+suffix)(h)
+        h = BatchNormalization()(h)
+
+        h = MaxPool2D(pool_size=(2, 2), name='pool_1' + suffix)(h)
+
+        h = Conv2D(filters=16, kernel_size=(6, 6),
+                   activation='relu', padding='same', name='conv2d_3' + suffix)(h)
+        h = Conv2D(filters=16, kernel_size=(6, 6),
+                   activation='relu', padding='same', name='conv2d_4'+suffix)(h)
+        h = BatchNormalization()(h)
+
+        h = MaxPool2D(pool_size=(3, 3), name='pool_2' + suffix)(h)
+
+        h = Conv2D(filters=16, kernel_size=(2, 2),
+                   activation='relu', padding='same', name='conv2d_5' + suffix)(h)
+        h = Conv2D(filters=16, kernel_size=(2, 2),
+                   activation='relu', padding='same', name='conv2d_6'+suffix)(h)
+        h = BatchNormalization()(h)
+
+        # h = Conv2D(filters=16, kernel_size=(2, 2),
+        #            activation='relu', padding='same', name='conv2d_7' + suffix)(h)
+        # h = Conv2D(filters=16, kernel_size=(2, 2),
+        #            activation='relu', padding='same', name='conv2d_8' + suffix)(h)
+        # h = BatchNormalization()(h)
 
         h = Flatten(name='flatten' + suffix)(h)
 
@@ -292,8 +305,8 @@ class DeepDefocusSimpleModel():
         def corr_CTF(y_true, y_pred):
             return corr_CTF_metric(y_true, y_pred, defocus_scaler, cs, kV)
 
-        model.compile(optimizer=optimizer, loss=loss_custom, metrics=[mae_defocus, angle_error, corr_CTF], loss_weights=None)
-        #model.compile(optimizer=optimizer, loss='mae', metrics=[mae_defocus, angle_error, corr_CTF], loss_weights=None)
+        #model.compile(optimizer=optimizer, loss=loss_custom, metrics=[mae_defocus, angle_error, corr_CTF], loss_weights=None)
+        model.compile(optimizer=optimizer, loss='mae', metrics=[mae_defocus, angle_error, corr_CTF], loss_weights=None)
 
         return model
 
