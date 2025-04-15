@@ -6,6 +6,42 @@ from concurrent.futures import ProcessPoolExecutor
 import tensorflow as tf
 from scipy.ndimage import rotate
 from skimage.transform import rescale
+from sklearn.preprocessing import StandardScaler
+
+
+# ----------------------- DATA PROCESSING UTILITIES --------------------------------------
+
+def fit_log_scaler_from_columns(*columns):
+    """
+    Fit a StandardScaler on the log10 of multiple defocus columns.
+
+    Parameters:
+        *columns: Multiple 1D arrays or Series of defocus values
+
+    Returns:
+        scaler: Fitted StandardScaler object
+    """
+    # Stack all columns vertically
+    log_values = np.log10(np.vstack([np.asarray(col).reshape(-1, 1) for col in columns]))
+
+    scaler = StandardScaler()
+    scaler.fit(log_values)
+    return scaler
+
+
+def transform_with_log_scaler(column, scaler):
+    """
+    Transform a single defocus column using a previously fitted log-scaler.
+
+    Parameters:
+        column: 1D array or Series (defocus)
+        scaler: StandardScaler fitted on log10 values
+
+    Returns:
+        scaled_column: The transformed values
+    """
+    log_vals = np.log10(np.asarray(column).reshape(-1, 1))
+    return scaler.transform(log_vals)
 
 
 # ---------------------- IMAGE PROCESSING UTILITIES --------------------------------------
@@ -62,7 +98,8 @@ def process_micrograph(micrograph_path, original_pixel_size, target_pixel_size=2
         return None
 
 
-def process_micrographs_parallel(micrograph_paths, output_dir, original_pixel_size, target_pixel_size=2, box_size=512, num_workers=None):
+def process_micrographs_parallel(micrograph_paths, output_dir, original_pixel_size, target_pixel_size=2, box_size=512,
+                                 num_workers=None):
     """
     Process multiple micrographs in parallel.
 
@@ -76,7 +113,8 @@ def process_micrographs_parallel(micrograph_paths, output_dir, original_pixel_si
     """
 
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        futures = {executor.submit(process_micrograph, path, original_pixel_size, target_pixel_size, box_size): path for path in micrograph_paths}
+        futures = {executor.submit(process_micrograph, path, original_pixel_size, target_pixel_size, box_size): path for
+                   path in micrograph_paths}
 
         for future in futures:
             path = futures[future]

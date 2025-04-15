@@ -13,6 +13,7 @@ from sklearn.preprocessing import RobustScaler
 
 from utils.metrics_and_model import (start_session, prepare_test_data, exampleCTFApplyingFunction, CosineAnnealingScheduler)
 from utils.plotting import (make_data_descriptive_plots, make_training_plots, make_testing_plots, make_testing_angle_plots)
+from utils.processing import (fit_log_scaler_from_columns, transform_with_log_scaler)
 from data_generator.data_generator import CustomDataGenPINN, CustomDataGenPINN_old
 from models.deep_defocus_model import DeepDefocusMultiOutputModel, DeepDefocusSimpleModel
 
@@ -64,23 +65,17 @@ if __name__ == "__main__":
 
     os.makedirs(modelDir, exist_ok=True)
 
-    # Stack the 'defocus_U' and 'defocus_V' columns into a single column
-    stacked_data = df_metadata[[COLUMNS['defocus_U'], COLUMNS['defocus_V']]].stack().reset_index(drop=True)
-    # Reshape the stacked data to a 2D array
-    stacked_data_2d = stacked_data.values.reshape(-1, 1)
+    # Fit scaler on all defocus input values
+    scaler = fit_log_scaler_from_columns(
+        df_metadata[COLUMNS['defocus_U']],
+        df_metadata[COLUMNS['defocus_V']]
+    )
 
-    # Instantiate the RobustScaler
-    scaler = RobustScaler()
-    # Fit the scaler to the stacked data
-    scaler.fit(stacked_data_2d)
-    df_metadata['DEFOCUS_U_SCALED'] = scaler.transform(df_metadata[COLUMNS['defocus_U']].values.reshape(-1, 1))
-    df_metadata['DEFOCUS_V_SCALED'] = scaler.transform(df_metadata[COLUMNS['defocus_V']].values.reshape(-1, 1))
+    # Apply scaler to transform each input defocus value
+    df_metadata['DEFOCUS_U_SCALED'] = transform_with_log_scaler(df_metadata[COLUMNS['defocus_U']], scaler)
+    df_metadata['DEFOCUS_V_SCALED'] = transform_with_log_scaler(df_metadata[COLUMNS['defocus_V']], scaler)
 
     df_metadata['NORMALIZED_ANGLE'] = df_metadata[COLUMNS['angle']]/180
-
-    #scaler_factor = SCALE_FACTOR
-    #df_metadata['DEFOCUS_U_SCALED'] = df_metadata[COLUMNS['defocus_U']]/scaler_factor
-    #df_metadata['DEFOCUS_V_SCALED'] = df_metadata[COLUMNS['defocus_V']]/scaler_factor
 
     # ----------------------------------------------- STATISTICS -------------------------------------------------------
 
