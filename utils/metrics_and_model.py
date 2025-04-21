@@ -314,7 +314,8 @@ def custom_loss_FSC(defocus_true, defocus_pred, angle_true, angle_pred, kv, Cs, 
     else:
         max_freq = nyquist_limit  # Default to Nyquist frequency
 
-    return max_freq
+    # Return so the higher the resolution the lower the loss
+    return 0.5 - max_freq
 
 
 def compute_ctf_2d(U, V, defocus_magnitude, defocus_angle, kv, Cs):

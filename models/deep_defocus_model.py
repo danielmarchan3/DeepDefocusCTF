@@ -1,12 +1,11 @@
 from tensorflow.keras.models import Model
-from tensorflow.keras.utils import plot_model
-from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, BatchNormalization, Dropout, Flatten, Dense, \
-    GlobalAveragePooling2D, Lambda, Concatenate, Reshape, UpSampling2D, MaxPool2D
+from tensorflow.keras.layers import Input, Conv2D, BatchNormalization, Dropout, Flatten, Dense, \
+    Concatenate, MaxPool2D
 from tensorflow.keras import regularizers
-from tensorflow.keras import backend as K
 
 import tensorflow as tf
-from ..utils.metrics_and_model import angle_error_metric, custom_loss_CTF_with_scaler, mae_defocus_error, corr_CTF_metric
+from ..utils.metrics_and_model import angle_error_metric, custom_loss_CTF_with_scaler, mae_defocus_error, \
+    corr_CTF_metric, custom_loss_FSC
 
 # ----------------------------- Models architecture -------------------------------------
 
