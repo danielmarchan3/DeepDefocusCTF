@@ -165,7 +165,8 @@ class DeepDefocusMultiOutputModel():
             return corr_CTF_metric(y_true, y_pred, defocus_scaler, cs, kV)
 
         #model.compile(optimizer=optimizer, loss=loss_custom, metrics=[angle_error, mae_defocus, corr_CTF], loss_weights=None)
-        model.compile(optimizer=optimizer, loss='mae', metrics=[angle_error, mae_defocus, corr_CTF], loss_weights=None)
+        model.compile(optimizer=optimizer, loss=loss_custom, metrics=[angle_error, mae_defocus, corr_CTF],
+                      loss_weights=None)
 
         return model
 
