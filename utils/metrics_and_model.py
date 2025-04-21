@@ -18,6 +18,7 @@ def start_session():
     print("Cleared previous TensorFlow session.")
     tf.keras.backend.set_floatx('float32')
 
+
 # ---------------------- DATA GENERATION UTILITIES --------------------------------------
 
 def prepare_test_data(df):
@@ -67,7 +68,7 @@ def mae_defocus_error(y_true, y_pred, defocus_scaler):
 
 
 def corr_CTF_metric(y_true, y_pred, defocus_scaler, cs, kV):
-    sampling_rate = 2 # TODO Risky to put it here
+    sampling_rate = 2  # TODO Risky to put it here
     size = 512
     epsilon = 1e-8
 
@@ -96,10 +97,10 @@ def corr_CTF_metric(y_true, y_pred, defocus_scaler, cs, kV):
         pred_angle = angle_pred * 180
 
         ctf_array_true = compute_ctf_tf(kV=kV, sampling_rate=sampling_rate, size=size, defocusU=defocus_U_true,
-                                              defocusV=defocus_V_true, Cs=cs, phase_shift_PP=0, angle_ast=true_angle)
+                                        defocusV=defocus_V_true, Cs=cs, phase_shift_PP=0, angle_ast=true_angle)
 
         ctf_array_pred = compute_ctf_tf(kV=kV, sampling_rate=sampling_rate, size=size, defocusU=defocus_U_pred,
-                                              defocusV=defocus_V_pred, Cs=cs, phase_shift_PP=0, angle_ast=pred_angle)
+                                        defocusV=defocus_V_pred, Cs=cs, phase_shift_PP=0, angle_ast=pred_angle)
 
         correlation_coefficient = pearson_correlation_ts(ctf_array_true, ctf_array_pred, epsilon)
         correlation_coefficient_loss = 1 - correlation_coefficient
@@ -113,6 +114,7 @@ def corr_CTF_metric(y_true, y_pred, defocus_scaler, cs, kV):
                                    dtype=tf.float32)
 
     return tf.reduce_mean(elementwise_losses)
+
 
 # ------------------------- Custom loss function for CTF based on a mathematical formula -------------------------------
 
@@ -178,8 +180,8 @@ def custom_loss_CTF_with_scaler(y_true, y_pred, defocus_scaler, cs, kV):
     defocus_U_loss = tf.reduce_mean(tf.abs(defocus_U_true_scaled - defocus_U_pred_scaled))
     defocus_V_loss = tf.reduce_mean(tf.abs(defocus_V_true_scaled - defocus_V_pred_scaled))
     defocus_loss = tf.reduce_mean([defocus_U_loss, defocus_V_loss])
-    angle_loss = tf.reduce_mean(tf.abs(angle_true - angle_pred)) # 0 - 1
-    image_loss = tf.reduce_mean(elementwise_losses) # -1 - 1
+    angle_loss = tf.reduce_mean(tf.abs(angle_true - angle_pred))  # 0 - 1
+    image_loss = tf.reduce_mean(elementwise_losses)  # -1 - 1
 
     weight_image_loss = 0.5
     weight_defocus_loss = 2
@@ -188,6 +190,7 @@ def custom_loss_CTF_with_scaler(y_true, y_pred, defocus_scaler, cs, kV):
     aggregated_loss = defocus_loss * weight_defocus_loss + angle_loss * weight_angle_loss + image_loss * weight_image_loss
 
     return aggregated_loss
+
 
 def custom_loss_CTF_with_scaler_old(y_true, y_pred, defocus_scaler, cs, kV):
     sampling_rate = 2
@@ -213,8 +216,8 @@ def custom_loss_CTF_with_scaler_old(y_true, y_pred, defocus_scaler, cs, kV):
     y_true_unscaled = (y_true * iqr_) + median_
     y_pred_unscaled = (y_pred * iqr_) + median_
 
-    #y_true_unscaled = y_true * defocus_scaler
-    #y_pred_unscaled = y_pred * defocus_scaler
+    # y_true_unscaled = y_true * defocus_scaler
+    # y_pred_unscaled = y_pred * defocus_scaler
 
     # Access individual output tensors
     defocus_U_true = y_true_unscaled[:, 0]  # Assuming defocus_U is the first output
@@ -230,20 +233,20 @@ def custom_loss_CTF_with_scaler_old(y_true, y_pred, defocus_scaler, cs, kV):
         pred_angle = angle_pred * 180
 
         ctf_array_true = compute_ctf_tf(kV=kV, sampling_rate=sampling_rate, size=size, defocusU=defocus_U_true,
-                                              defocusV=defocus_V_true, Cs=cs, phase_shift_PP=0, angle_ast=true_angle)
+                                        defocusV=defocus_V_true, Cs=cs, phase_shift_PP=0, angle_ast=true_angle)
 
         ctf_array_pred = compute_ctf_tf(kV=kV, sampling_rate=sampling_rate, size=size, defocusU=defocus_U_pred,
-                                              defocusV=defocus_V_pred, Cs=cs, phase_shift_PP=0, angle_ast=pred_angle)
+                                        defocusV=defocus_V_pred, Cs=cs, phase_shift_PP=0, angle_ast=pred_angle)
 
         # Print intermediate values for debugging
-        #tf.print("ctf_array_true:", ctf_array_true)
-        #tf.print("ctf_array_pred:", ctf_array_pred)
+        # tf.print("ctf_array_true:", ctf_array_true)
+        # tf.print("ctf_array_pred:", ctf_array_pred)
         correlation_coefficient = pearson_correlation_ts(ctf_array_true, ctf_array_pred, epsilon)
         correlation_coefficient_loss = 1 - correlation_coefficient
         tf.print("ctf_correlation:", correlation_coefficient)
 
-        #return correlation_coefficient_loss
-        return tf.abs(ctf_array_true - ctf_array_pred) # MSE or MAE
+        # return correlation_coefficient_loss
+        return tf.abs(ctf_array_true - ctf_array_pred)  # MSE or MAE
 
     tf.print("defocus_U_true:", defocus_U_true)
     tf.print("defocus_V_true:", defocus_V_true)
@@ -273,7 +276,75 @@ def custom_loss_CTF_with_scaler_old(y_true, y_pred, defocus_scaler, cs, kV):
 
     return aggregated_loss
 
+
+def custom_loss_FSC(defocus_true, defocus_pred, angle_true, angle_pred, kv, Cs, threshold=0.143, size=512):
+    # Create meshgrid of spatial frequencies
+    U = np.fft.fftfreq(size, d=1.0 / size)  # Generate frequencies in the U direction
+    V = np.fft.fftfreq(size, d=1.0 / size)  # Generate frequencies in the V direction
+    U, V = np.meshgrid(U, V)
+
+    # Compute the CTF for true and predicted defocus values
+    ctf_true = compute_ctf_2d(U, V, defocus_true, angle_true, kv, Cs)
+    ctf_pred = compute_ctf_2d(U, V, defocus_pred, angle_pred, kv, Cs)
+
+    # Compute correlation between CTFs
+    correlation = np.abs(ctf_true - ctf_pred)
+
+    # Calculate the spatial frequencies (in polar coordinates)
+    freqs = np.sqrt(U ** 2 + V ** 2)
+
+    # Mask to limit the frequencies to the Nyquist frequency region
+    nyquist_limit = 0.5  # Nyquist frequency for size 512
+    mask = freqs <= nyquist_limit  # Only consider frequencies below the Nyquist frequency
+
+    # Apply the mask to the correlation values
+    correlation = correlation[mask]
+    freqs = freqs[mask]
+
+    # Average correlation at each frequency
+    freq_unique = np.unique(freqs)  # Unique frequencies in the region of interest
+    avg_correlation = np.array([np.mean(correlation[freqs == f]) for f in freq_unique])
+
+    # Find the frequencies where the average correlation is under the threshold
+    freq_below_threshold = freq_unique[avg_correlation < threshold]
+
+    # Return the highest frequency below the threshold, or the highest frequency (Nyquist) if none is under the threshold
+    if freq_below_threshold.size > 0:
+        max_freq = np.max(freq_below_threshold)
+    else:
+        max_freq = nyquist_limit  # Default to Nyquist frequency
+
+    return max_freq
+
+
+def compute_ctf_2d(U, V, defocus_magnitude, defocus_angle, kv, Cs):
+    # Constants
+    lambda_e = 1.973e-10 / np.sqrt(1 + (kv / 0.510998902) ** 2)
+    lambda_e *= 1e10  # convert to Å
+
+    # Convert defocus angle from degrees to radians
+    defocus_angle_rad = np.radians(defocus_angle)
+
+    # Components of defocus vector in U and V directions
+    Delta_z_U = defocus_magnitude * np.cos(defocus_angle_rad)
+    Delta_z_V = defocus_magnitude * np.sin(defocus_angle_rad)
+
+    # Spatial frequency magnitude
+    k = np.sqrt(U**2 + V**2)
+
+    # CTF phase shift function χ(U, V)
+    chi_uv = np.pi * lambda_e * k**2 * (Delta_z_U * U / k + Delta_z_V * V / k) \
+             - (np.pi / 2) * Cs * lambda_e**3 * k**4
+
+    # Amplitude contrast
+    A = 0.1
+
+    # Contrast Transfer Function
+    ctf = - (np.sqrt(1 - A**2) * np.sin(chi_uv) + A * np.cos(chi_uv))
+    return ctf
+
 # -------------------------------- Utils to test the ctf function approach --------------------------------------------
+
 
 def exampleCTFApplyingFunction(df_metadata):
     """Function to test TensorFlow CTF implementations."""
@@ -297,7 +368,7 @@ def exampleCTFApplyingFunction(df_metadata):
                                   defocusU=defocusU, defocusV=defocusV, Cs=cs,
                                   phase_shift_PP=0, angle_ast=defocusA)
 
-    #ctf_array2_ts = compute_ctf_tf(kV=kV, sampling_rate=sampling_rate, size=size,
+    # ctf_array2_ts = compute_ctf_tf(kV=kV, sampling_rate=sampling_rate, size=size,
     #                               defocusU=defocusU, defocusV=defocusV, Cs=cs,
     #                               phase_shift_PP=0, angle_ast=defocusA + 45)
 
@@ -336,6 +407,4 @@ class CosineAnnealingScheduler(Callback):
         lr = self.initial_learning_rate * 0.5 * (1 + tf.math.cos(np.pi * epoch / self.max_epochs))
         tf.keras.backend.set_value(self.model.optimizer.learning_rate, lr)
         if self.verbose > 0:
-            print(f'\nEpoch {epoch+1}/{self.max_epochs}, Learning Rate: {lr:.6f}')
-
-
+            print(f'\nEpoch {epoch + 1}/{self.max_epochs}, Learning Rate: {lr:.6f}')
