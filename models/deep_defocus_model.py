@@ -310,7 +310,7 @@ class DeepDefocusSimpleModel():
         return model
 
 # --------------------------- To extract models captured features ------------------------------------------------
-from utils.processing import center_window
+from ..utils.processing import center_window
 import os
 import matplotlib.pyplot as plt
 
