@@ -11,8 +11,10 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import RobustScaler
 
-from utils.metrics_and_model import (start_session, prepare_test_data, exampleCTFApplyingFunction, CosineAnnealingScheduler)
-from utils.plotting import (make_data_descriptive_plots, make_training_plots, make_testing_plots, make_testing_angle_plots)
+from utils.metrics_and_model import (start_session, prepare_test_data, exampleCTFApplyingFunction,
+                                     CosineAnnealingScheduler)
+from utils.plotting import (make_data_descriptive_plots, make_training_plots, make_testing_plots,
+                            make_testing_angle_plots)
 from utils.processing import (fit_log_scaler_from_columns, transform_with_log_scaler)
 from data_generator.data_generator import CustomDataGenPINN, CustomDataGenPINN_old
 from models.deep_defocus_model import DeepDefocusMultiOutputModel, DeepDefocusSimpleModel
@@ -24,8 +26,7 @@ LEARNING_RATE_DEF = 0.0001
 
 COLUMNS = {'id': 'ID', 'defocus_U': 'DEFOCUS_U', 'defocus_V': 'DEFOCUS_V',
            'sinAngle': 'Sin(2*angle)', 'cosAngle': 'Cos(2*angle)',
-           'angle': 'Angle', 'resolution':'Resolution','kV': 'kV', 'file': 'FILE'}
-
+           'angle': 'Angle', 'resolution': 'Resolution', 'kV': 'kV', 'file': 'FILE'}
 
 # ------------------------ MAIN PROGRAM -----------------------------
 if __name__ == "__main__":
@@ -37,9 +38,10 @@ if __name__ == "__main__":
 
     metadataDir = sys.argv[1]
     modelDir = sys.argv[2]
-    input_size = (256, 256, 1) # We have 512x512 PSD images at 1A resolution, so we are staying only with the center region of 2A
+    input_size = (
+    256, 256, 1)  # We have 512x512 PSD images at 1A resolution, so we are staying only with the center region of 2A
     objective_res = 2
-    sampling_rate = 1 # The PSDs of our images have a sampling rate of 1A
+    sampling_rate = 1  # The PSDs of our images have a sampling rate of 1A
     ground_Truth = False
     testing_Bool = True
     plots_Bool = True
@@ -75,7 +77,7 @@ if __name__ == "__main__":
     df_metadata['DEFOCUS_U_SCALED'] = transform_with_log_scaler(df_metadata[COLUMNS['defocus_U']], scaler)
     df_metadata['DEFOCUS_V_SCALED'] = transform_with_log_scaler(df_metadata[COLUMNS['defocus_V']], scaler)
 
-    df_metadata['NORMALIZED_ANGLE'] = df_metadata[COLUMNS['angle']]/180
+    df_metadata['NORMALIZED_ANGLE'] = df_metadata[COLUMNS['angle']] / 180
 
     # ----------------------------------------------- STATISTICS -------------------------------------------------------
 
@@ -94,16 +96,16 @@ if __name__ == "__main__":
 
     # ------------------------------------- TEST CTF FUNCTION IMPLEMENTATION -------------------------------------------
 
-    #exampleCTFApplyingFunction(df_train)
+    # exampleCTFApplyingFunction(df_train)
 
     # ------------------------------------------- TRAINING MODELS ------------------------------------------------------
 
     # OJO: The number of batches is equal to len(df)//batch_size
     traingen = CustomDataGenPINN(data=df_train.head(1984), batch_size=BATCH_SIZE,
-                                objective_res=objective_res, sampling_rate=sampling_rate)
+                                 objective_res=objective_res, sampling_rate=sampling_rate)
 
     valgen = CustomDataGenPINN(data=df_validate.head(480), batch_size=BATCH_SIZE,
-                                objective_res=objective_res, sampling_rate=sampling_rate)
+                               objective_res=objective_res, sampling_rate=sampling_rate)
 
     testgen = CustomDataGenPINN(data=df_test, batch_size=1,
                                 objective_res=objective_res, sampling_rate=sampling_rate)
@@ -119,12 +121,11 @@ if __name__ == "__main__":
         # CosineAnnealingScheduler(LEARNING_RATE_DEF, EPOCHS, verbose=1),
         callbacks.EarlyStopping(monitor='val_loss', patience=20),
         callbacks.ModelCheckpoint(filepath=os.path.join(path_logs_defocus, 'Best_Weights.weights.h5'),
-                                      save_weights_only=True,
-                                      save_best_only=True,
-                                      monitor='val_loss',
-                                      verbose=0)
-        ]
-
+                                  save_weights_only=True,
+                                  save_best_only=True,
+                                  monitor='val_loss',
+                                  verbose=0)
+    ]
 
     # Check if GPUs are available
     gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -139,9 +140,9 @@ if __name__ == "__main__":
                 start_time = time()
                 model_defocus = DeepDefocusMultiOutputModel(width=input_size[0], height=input_size[1]
                                                             ).getFullModel(learning_rate=LEARNING_RATE_DEF,
-                                                                               defocus_scaler=scaler, cs=2.7e7,
-                                                                               kV=300)
-                #model_defocus = DeepDefocusSimpleModel(width=input_size[0], height=input_size[1]
+                                                                           defocus_scaler=scaler, cs=2.7e7,
+                                                                           kV=300)
+                # model_defocus = DeepDefocusSimpleModel(width=input_size[0], height=input_size[1]
                 #                                            ).getFullModel(learning_rate=LEARNING_RATE_DEF,
                 #                                                           defocus_scaler=scaler, cs=2.7e7,
                 #                                                           kV=300)
@@ -153,14 +154,11 @@ if __name__ == "__main__":
                                                 callbacks=callbacks_list_def,
                                                 verbose=1)
 
-
-
             elapsed_time = time() - start_time
             print("Time in training model: %0.10f seconds." % elapsed_time)
 
             if plots_Bool:
                 make_training_plots(history_defocus, path_logs_defocus, "defocus_")
-
 
             one_image_data_path = df_test.head(1)['FILE'].values[0]
             # extract_CNN_layer_features(path_logs_defocus, one_image_data_path,
@@ -185,10 +183,11 @@ if __name__ == "__main__":
         print("Test mode")
         # loadModelDir = os.path.join(modelDir, 'model.h5')
         # model = load_model(loadModelDir)
-        model_defocus = DeepDefocusMultiOutputModel(width=input_size[0], height=input_size[1]).getFullModel(learning_rate=0.001,
-                                                                                        defocus_scaler=scaler,
-                                                                                       cs=2.7e7, kV=200)
-        #model_defocus = DeepDefocusSimpleModel(width=input_size[0], height=input_size[1]).getFullModel(
+        model_defocus = DeepDefocusMultiOutputModel(width=input_size[0], height=input_size[1]).getFullModel(
+            learning_rate=0.001,
+            defocus_scaler=scaler,
+            cs=2.7e7, kV=200)
+        # model_defocus = DeepDefocusSimpleModel(width=input_size[0], height=input_size[1]).getFullModel(
         #    learning_rate=0.001,
         #    defocus_scaler=scaler,
         #    cs=2.7e7, kV=200)
@@ -202,8 +201,8 @@ if __name__ == "__main__":
         defocusPrediction = np.zeros_like(defocusPrediction_scaled)
         defocusPrediction[:, 0] = scaler.inverse_transform(defocusPrediction_scaled[:, 0].reshape(-1, 1)).flatten()
         defocusPrediction[:, 1] = scaler.inverse_transform(defocusPrediction_scaled[:, 1].reshape(-1, 1)).flatten()
-        #defocusPrediction[:, 0] = defocusPrediction_scaled[:, 0] * scaler_factor
-        #defocusPrediction[:, 1] = defocusPrediction_scaled[:, 1] * scaler_factor
+        # defocusPrediction[:, 0] = defocusPrediction_scaled[:, 0] * scaler_factor
+        # defocusPrediction[:, 1] = defocusPrediction_scaled[:, 1] * scaler_factor
         defocusPrediction[:, 2] = defocusPrediction_scaled[:, 2] * 180
 
         mae_u = mean_absolute_error(defocusTest[:, 0], defocusPrediction[:, 0])
