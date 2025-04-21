@@ -6,7 +6,7 @@ from tensorflow.keras import regularizers
 from tensorflow.keras import backend as K
 
 import tensorflow as tf
-from utils.metrics_and_model import angle_error_metric, custom_loss_CTF_with_scaler, mae_defocus_error, corr_CTF_metric
+from ..utils.metrics_and_model import angle_error_metric, custom_loss_CTF_with_scaler, mae_defocus_error, corr_CTF_metric
 
 # ----------------------------- Models architecture -------------------------------------
 
