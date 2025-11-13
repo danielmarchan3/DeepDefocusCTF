@@ -45,6 +45,15 @@ def process_micrograph(micrograph_path, original_pixel_size, target_pixel_size=2
         with mrcfile.open(micrograph_path, permissive=True) as mrc:
             img = mrc.data.astype(np.float32)
 
+        # Normalizar las dimensiones en caso de lo que lea como volumen
+        if img.ndim == 3:
+            if img.shape[0] == 1:
+                img = img[0]        # (1,H,W) -> (H,W)
+            else:
+                raise ValueError(f"MRC contains a stack with {img.shape[0]} slices; expected a single 2D micrograph.")
+        elif img.ndim != 2:
+            raise ValueError(f"Unsupported image shape: {img.shape}")
+
         # Compute rescale factor
         rescale_factor = original_pixel_size / target_pixel_size
         downsampled_img = rescale(img, rescale_factor, anti_aliasing=True, preserve_range=True)
