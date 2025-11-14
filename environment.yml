@@ -12,5 +12,4 @@ dependencies:
   - scikit-image
   - tensorflow
   - scikit-learn
-  - sqlite3
   - pip
