@@ -45,7 +45,7 @@ def process_micrograph(micrograph_path, original_pixel_size, target_pixel_size=2
         with mrcfile.open(micrograph_path, permissive=True) as mrc:
             img = mrc.data.astype(np.float32)
 
-        # Normalizar las dimensiones en caso de lo que lea como volumen
+        # Normalize dimension in case mrcfile is reading image as volume
         if img.ndim == 3:
             if img.shape[0] == 1:
                 img = img[0]        # (1,H,W) -> (H,W)
