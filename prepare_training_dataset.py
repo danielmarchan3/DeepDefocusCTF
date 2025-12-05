@@ -5,7 +5,6 @@ import sqlite3
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
 from utils.processing import rotate_image, sum_angles, compute_ctf_tf, process_micrographs_parallel
 
 # Constants
@@ -81,8 +80,25 @@ def import_ctf(directory: str, use_ground_truth: bool) -> list:
 
 
 def create_metadata_ctf(file_list: list, output_dir: str, pixel_size: float, use_ground_truth: bool):
-    """Generate metadata file for training and copy files to the output directory."""
     os.makedirs(output_dir, exist_ok=True)
+    """
+    Generate a metadata CSV file for training and copy files to the output directory.
+
+    Parameters:
+    - file_list (list): A list of tuples containing CTF information for each micrograph.
+      Each tuple includes fields like ID, defocus values, angle, resolution, kV, and original file path.
+    - output_dir (str): Directory where the metadata file and PSD files will be stored.
+    - pixel_size (float): Original pixel size of the micrographs in Ångströms.
+    - use_ground_truth (bool): If True, includes ground truth defocus values and angles in the metadata for comparison.
+
+    Behavior:
+    - Creates a DataFrame from file_list with columns for CTF parameters.
+    - Adds a PIXEL_SIZE column.
+    - Generates a unique PSD filename for each micrograph using the pattern:
+      ID_basename_psd.npy and updates the FILE column to point to this PSD file.
+    - Calls process_micrographs_parallel to compute PSDs for all micrographs.
+    - Saves or appends the metadata to metadata.csv in output_dir.
+    """
 
     if use_ground_truth:
         cols = ['ID', 'DEFOCUS_U', 'DEFOCUS_V', 'Sin(2*angle)', 'Cos(2*angle)', 'Angle', 'Resolution', 'kV', 'FILE',
@@ -93,16 +109,26 @@ def create_metadata_ctf(file_list: list, output_dir: str, pixel_size: float, use
     df_metadata = pd.DataFrame(file_list, columns=cols)
     df_metadata.insert(7, "PIXEL_SIZE", pixel_size, True)
 
-    mic_list = []
+    # Pair list (input_mrc_path, output_psd_path)
+    mic_pairs = []
+
     for index in df_metadata.index:
         fn_root = df_metadata.loc[index, "FILE"]
-        fn_base = os.path.basename(fn_root)
-        mic_list.append(fn_root)
-        psd_filename = os.path.join(output_dir, fn_base.replace(".mrc", "_psd.npy"))
+        fn_base = os.path.basename(fn_root).replace(".mrc", "")
+        ctf_id = df_metadata.loc[index, "ID"]
+        psd_filename = os.path.join(output_dir, f"{ctf_id}_{fn_base}_psd.npy")
+
+        # Save the output filename in the dataframe
         df_metadata.at[index, "FILE"] = psd_filename
 
+        # Add pair to the processing list
+        mic_pairs.append((fn_root, psd_filename))
+
+    print(f"Number of micrographs to process: {len(mic_pairs)}")
     metadata_path = os.path.join(output_dir, "metadata.csv")
-    process_micrographs_parallel(mic_list, output_dir, pixel_size, target_pixel_size=1)
+
+    # Send pairs to parallel processing function
+    process_micrographs_parallel(mic_pairs, original_pixel_size=pixel_size, target_pixel_size=1)
 
     if os.path.exists(metadata_path):
         df_prev = pd.read_csv(metadata_path)

@@ -1,7 +1,7 @@
 import numpy as np
 import os
 import mrcfile
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import tensorflow as tf
 from scipy.ndimage import rotate
@@ -64,77 +64,97 @@ def compute_psd(patch):
     return np.log1p(psd)  # Apply log scaling for better visualization
 
 
-def process_micrograph(micrograph_path, original_pixel_size, target_pixel_size=2, box_size=512):
+def process_micrograph(micrograph_path, output_path, original_pixel_size, target_pixel_size=1, box_size=512):
     """
-    Compute the averaged PSD from patches of a downsampled micrograph.
+    Process a single micrograph and save the averaged Power Spectral Density (PSD) to the specified output path (.npy).
 
     Parameters:
-    - micrograph_path (str): Path to the .mrc micrograph.
-    - original_pixel_size (float): The original pixel size in Å.
-    - target_pixel_size (float): The target pixel size in Å (default 2 Å).
-    - box_size (int): Size of extracted patches.
+    - micrograph_path (str): Path to the input .mrc micrograph file.
+    - output_path (str): Path where the computed PSD will be saved as a .npy file.
+    - original_pixel_size (float): Original pixel size of the micrograph in Ångströms.
+    - target_pixel_size (float, default=1): Target pixel size for downsampling before PSD computation.
+    - box_size (int, default=512): Size of patches extracted from the downsampled micrograph for PSD calculation.
 
-    Returns:
-    - avg_psd (np.array): The averaged Power Spectral Density (PSD).
+    Behavior:
+    - Loads the micrograph from the .mrc file and ensures it is a single 2D image.
+    - Downsamples the image to match the target pixel size using anti-aliasing.
+    - Extracts patches of size `box_size` from the downsampled image.
+    - Computes the PSD for each patch and averages them to obtain the final PSD.
+    - Saves the averaged PSD as a .npy file at `output_path`.
+    - Returns True if successful, False otherwise.
     """
+    
     try:
         with mrcfile.open(micrograph_path, permissive=True) as mrc:
             img = mrc.data.astype(np.float32)
 
-        # Normalize dimension in case mrcfile is reading image as volume
+        # Check dimensions
         if img.ndim == 3:
             if img.shape[0] == 1:
-                img = img[0]        # (1,H,W) -> (H,W)
+                img = img[0]
             else:
                 raise ValueError(f"MRC contains a stack with {img.shape[0]} slices; expected a single 2D micrograph.")
         elif img.ndim != 2:
             raise ValueError(f"Unsupported image shape: {img.shape}")
 
-        # Compute rescale factor
+        # Rescale
         rescale_factor = original_pixel_size / target_pixel_size
         downsampled_img = rescale(img, rescale_factor, anti_aliasing=True, preserve_range=True)
-        # Extract patches from the downsampled image
-        patches = extract_patches(downsampled_img, box_size=box_size)
 
-        # Compute PSD for each patch and average them
+        # Extract patches and promediate PSD
+        patches = extract_patches(downsampled_img, box_size=box_size)
         psds = np.array([compute_psd(patch) for patch in patches])
         avg_psd = np.mean(psds, axis=0)
 
-        return avg_psd
+        # Save in output_path
+        np.save(output_path, avg_psd)
+        return True
 
     except Exception as e:
         print(f"Error processing {micrograph_path}: {e}")
-        return None
+        return False
 
 
-def process_micrographs_parallel(micrograph_paths, output_dir, original_pixel_size, target_pixel_size=2, box_size=512,
-                                 num_workers=None):
+def process_micrographs_parallel(mic_pairs, original_pixel_size, target_pixel_size=1, box_size=512, num_workers=None):
+
     """
-    Process multiple micrographs in parallel.
+    Process multiple micrographs in parallel and save PSDs in output_dir.
 
     Parameters:
-    - micrograph_paths (list): List of paths to .mrc micrographs.
-    - output_dir (path): Path where to store the psds
-    - original_pixel_size (float): The original pixel size in Å.
-    - target_pixel_size (float): The target pixel size in Å (default 2 Å).
-    - box_size (int): Size of extracted patches.
-    - num_workers (int): Number of parallel workers (default: use all available CPUs).
+    - micrograph_paths (list): List of paths to .mrc micrograph files.
+    - output_dir (str): Directory where PSD .npy files will be saved.
+    - original_pixel_size (float): Original pixel size of the micrographs in Ångströms.
+    - target_pixel_size (float, default=1): Target pixel size for downsampling before PSD computation.
+    - box_size (int, default=512): Size of patches extracted from each micrograph for PSD calculation.
+    - num_workers (int or None): Number of parallel workers (defaults to all available CPUs if None).
+    - file_to_id (dict or None): Optional mapping {micrograph_path: ID} to generate unique PSD filenames
+      using the pattern ID_basename_psd.npy. If not provided, filenames will use only the basename.
+
+    Behavior:
+    - Uses ProcessPoolExecutor to compute PSDs in parallel by calling process_micrograph for each micrograph.
+    - For each result, saves the PSD as a .npy file in output_dir:
+      - If file_to_id is provided: ID_basename_psd.npy.
+      - Otherwise: basename_psd.npy.
     """
 
-    with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        futures = {executor.submit(process_micrograph, path, original_pixel_size, target_pixel_size, box_size): path for
-                   path in micrograph_paths}
+    if num_workers is None:
+        num_workers = os.cpu_count() or 1
 
-        for future in futures:
-            path = futures[future]
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        futures = {
+            executor.submit(process_micrograph, in_path, out_path, original_pixel_size, target_pixel_size, box_size): (in_path, out_path)
+            for (in_path, out_path) in mic_pairs
+        }
+
+        for future in as_completed(futures):
+            in_path, out_path = futures[future]
             try:
-                result = future.result()
-                if result is not None:
-                    # Save the PSD as a .npy file
-                    psd_filename = os.path.join(output_dir, os.path.basename(path).replace(".mrc", "_psd.npy"))
-                    np.save(psd_filename, result)
+                success = future.result()
+                if not success:
+                    print(f"Failed to process {in_path} -> {out_path}")
             except Exception as e:
-                print(f"Failed to process {path}: {e}")
+                print(f"Exception processing {in_path} -> {out_path}: {e}")
+
 
 
 def rotate_image(image_path, angle):
