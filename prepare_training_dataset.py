@@ -45,17 +45,17 @@ def import_ctf(directory: str, use_ground_truth: bool) -> list:
     connection = sqlite3.connect(db_path)
 
     # Swap this line to adapt query for roodmus
-    # query = "SELECT id, enabled, c08, c01, c02, c03, c12 FROM Objects"
-    query = "SELECT id, enabled, c08, c01, c02, c03, c26, c12 FROM Objects"
+    query = "SELECT id, enabled, c08, c01, c02, c03, c12 FROM Objects"
+    # query = "SELECT id, enabled, c08, c01, c02, c03, c26, c12 FROM Objects"
     cursor = connection.execute(query)
 
     df_gt = load_ground_truth_values(GROUND_TRUTH_PATH) if use_ground_truth else None
 
     for row in cursor:
         # Swap this line to adapt query for roodmus
-        # ctf_id, enabled, file, dU, dV, dAngle, kV = row
-        # resolution = -1
-        ctf_id, enabled, file, dU, dV, dAngle, resolution, kV = row
+        ctf_id, enabled, file, dU, dV, dAngle, kV = row
+        resolution = -1
+        # ctf_id, enabled, file, dU, dV, dAngle, resolution, kV = row
         file = os.path.join(re.sub(r"/Runs.*", "", directory), file)
 
         if use_ground_truth:
@@ -75,6 +75,7 @@ def import_ctf(directory: str, use_ground_truth: bool) -> list:
         print(f"Processed ID={ctf_id}, FILE={file}, DEFOCUS_U={dU}, DEFOCUS_V={dV}, ANGLE={dAngle}, kV={kV}")
 
     connection.close()
+    print(f"Entries read from database: {len(file_list)}")
     print("Database closed successfully.")
     return file_list
 
